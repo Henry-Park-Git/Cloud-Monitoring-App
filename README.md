@@ -1,56 +1,115 @@
-# Welcome to your CDK JavaScript project
+# Cloud Monitoring App
 
-#Cloud Monitoring App
-A project to monitor and notify the status of your web applications using AWS services like CloudWatch, Synthetics, and SNS.
+This project monitors and notifies the status of web applications using AWS services like CloudWatch, Synthetics, and SNS.
 
-#Description
-This project sets up a monitoring system for your web applications using AWS CDK. It creates a synthetic canary to periodically check the status of a website and sends notifications if the site is down.
+## Description
 
-#Features
-Synthetic canary using AWS Synthetics
-Alarm setup using AWS CloudWatch
-Email notifications using AWS SNS
+This project sets up a monitoring system for web applications using AWS CDK. It creates a synthetic canary to periodically check the status of a website and sends notifications if the site is down.
 
+## Features
 
-#Prerequisites
-Node.js
-AWS CLI configured with appropriate permissions
-AWS CDK
+- Synthetic Canary: Utilizes AWS Synthetics to simulate user interactions and monitor key performance metrics.
+- CloudWatch Alarms: Sets up alarms based on availability and latency metrics to proactively detect issues.
+- SNS Notifications: Sends alerts through AWS SNS to subscribed endpoints such as email.
 
-#Adding Alarms
-This project includes CloudWatch Alarms to notify you if the synthetic canary detects an issue with your website. The alarm setup includes:
+## Architecture
 
-Canary Failure Alarm: Triggers when the synthetic canary fails.
+The application architecture includes:
 
-#How It Works
-Synthetic Canary: Periodically checks the status of the website.
+- AWS CDK Stack: Defines infrastructure as code using JavaScript for provisioning AWS resources.
+- Synthetic Canary: A Lambda function periodically performs checks on predefined URLs.
+- CloudWatch Metrics: Captures availability and latency metrics for monitoring purposes.
+- SNS Topic: Receives alarms triggered by CloudWatch and sends notifications to subscribed endpoints.
 
-CloudWatch Alarms
-Overview
-The stack sets up two CloudWatch Alarms to monitor the health and performance of the canary:
+## Prerequisites
 
-Availability Alarm: This alarm monitors the success rate of the canary.
-Latency Alarm: This alarm monitors the latency of the canary.
-Availability Alarm
+Before running this project, ensure you have the following installed and configured:
+
+- Node.js: JavaScript runtime environment.
+- AWS CLI: Configured with appropriate IAM permissions.
+- AWS CDK: Installed globally on your development machine.
+
+## Getting Started
+
+1. Clone Repository: Clone this repository to your local machine.
+   
+   ```bash
+   git clone <repository-url>
+   cd Cloud-Monitoring-App
+   ```
+
+2. Install Dependencies: Install project dependencies using npm.
+
+   ```bash
+   npm install
+   ```
+
+3. Configure AWS CLI: Ensure your AWS CLI is configured with credentials that have permissions to deploy AWS resources.
+
+   ```bash
+   aws configure
+   ```
+
+4. Deploy Stack: Deploy the CDK stack to your AWS account.
+
+   ```bash
+   cdk deploy
+   ```
+
+5. Monitor and Manage: Explore the deployed resources in your AWS Management Console. Use `cdk destroy` to remove the stack when no longer needed.
+
+## Adding Alarms
+
+This project includes CloudWatch Alarms to notify you of issues detected by the synthetic canary.
+
+### Canary Failure Alarm
+
+Triggers when the synthetic canary detects a failure.
+
+## How It Works
+
+### Synthetic Canary
+
+Periodically checks the status of configured websites.
+
+### CloudWatch Alarms Overview
+
+The stack sets up two types of CloudWatch Alarms:
+
+Availability Alarm: Monitors the success rate of the canary.
+
 Metric: SuccessPercent
 Condition: Triggers when the success percentage is less than 90% over a period of 5 minutes.
-Actions: Sends a notification to an SNS topic which can be subscribed to via email or other endpoints.
+Actions: Sends notifications to an SNS topic subscribed via email or other endpoints.
+Latency Alarm: Monitors the latency of the canary.
 
-Latency Alarm
 Metric: Duration
 Condition: Triggers when the latency exceeds 3 seconds (3000 milliseconds).
-Actions: Sends a notification to an SNS topic which can be subscribed to via email or other endpoints.
+Actions: Sends notifications to an SNS topic subscribed via email or other endpoints.
 
-SNS Topic: Sends notifications to the subscribed email address.
+### SNS Topic
 
-You should explore the contents of this project. It demonstrates a CDK app with an instance of a stack (`WebCrawlerStack`)
-which contains an Amazon SQS queue that is subscribed to an Amazon SNS topic.
+Sends notifications to the subscribed email address.
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app. The build step is not required when using JavaScript.
+## Contributing
+
+Contributions are welcome! Please fork the repository and submit a pull request with your proposed changes.
+
+## Acknowledgments
+
+- AWS CDK documentation and community for guidance and support.
+- Stack Overflow and AWS forums for troubleshooting assistance.
+
+## Explore
+
+This project demonstrates a CDK app with an instance of a stack (`WebCrawlerStack`) that includes the setup of synthetic canaries and associated alarms.
+
+The `cdk.json` file defines configurations for the CDK Toolkit.
 
 ## Useful commands
 
-* `npm run test`         perform the jest unit tests
-* `cdk deploy`           deploy this stack to your default AWS account/region
-* `cdk diff`             compare deployed stack with current state
-* `cdk synth`            emits the synthesized CloudFormation template
+- `npm run test`: Runs Jest unit tests.
+- `cdk deploy`: Deploys this stack to your default AWS account/region.
+- `cdk diff`: Compares deployed stack with the current state.
+- `cdk synth`: Emits the synthesized CloudFormation template.
+
