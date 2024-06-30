@@ -91,7 +91,7 @@ Actions: Sends notifications to an SNS topic subscribed via email or other endpo
 
 Sends notifications to the subscribed email address.
 
-### DynamoDB Integration:
+## DynamoDB Integration:
 
 The DynamoDB table is designed to store alarm data for analysis and troubleshooting. Each alarm is stored as an item in the table, with details about the alarm name, state change, reason, and timestamp.
 
@@ -115,14 +115,23 @@ The Lambda function processes incoming alarm notifications from SNS and stores t
 Functionality
 
    1.	Receive SNS Notification:
+
 	•	The Lambda function is subscribed to the SNS topic that receives alarm notifications from CloudWatch.
+
 	•	When an alarm state changes, an SNS message is sent to the Lambda function.
+
 	2.	Parse the SNS Message:
+
 	•	The Lambda function parses the SNS message to extract alarm details.
+
 	•	It logs the received event and checks for the presence of SNS records.
+
 	3.	Store Alarm Data in DynamoDB:
+
 	•	The function constructs the item to be stored in DynamoDB using the extracted alarm details.
+
 	•	It then writes the item to the DynamoDB table.
+   
 	•	Success and error logs are generated based on the outcome of the write operation.
 
 
