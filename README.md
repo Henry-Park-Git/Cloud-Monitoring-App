@@ -114,25 +114,18 @@ The Lambda function processes incoming alarm notifications from SNS and stores t
 
 Functionality
 
-   1.	Receive SNS Notification:
+1.	Receive SNS Notification:
+- The Lambda function is subscribed to the SNS topic that receives alarm notifications from CloudWatch.
+- When an alarm state changes, an SNS message is sent to the Lambda function.
 
-	•	The Lambda function is subscribed to the SNS topic that receives alarm notifications from CloudWatch.
+2.	Parse the SNS Message:
+- The Lambda function parses the SNS message to extract alarm details.
+- It logs the received event and checks for the presence of SNS records.
 
-	•	When an alarm state changes, an SNS message is sent to the Lambda function.
-
-	2.	Parse the SNS Message:
-
-	•	The Lambda function parses the SNS message to extract alarm details.
-
-	•	It logs the received event and checks for the presence of SNS records.
-
-	3.	Store Alarm Data in DynamoDB:
-
-	•	The function constructs the item to be stored in DynamoDB using the extracted alarm details.
-
-	•	It then writes the item to the DynamoDB table.
-   
-	•	Success and error logs are generated based on the outcome of the write operation.
+3.	Store Alarm Data in DynamoDB:
+- The function constructs the item to be stored in DynamoDB using the extracted alarm details.
+- It then writes the item to the DynamoDB table.
+- Success and error logs are generated based on the outcome of the write operation.
 
 
 ## Contributing
