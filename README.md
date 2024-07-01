@@ -91,6 +91,43 @@ Actions: Sends notifications to an SNS topic subscribed via email or other endpo
 
 Sends notifications to the subscribed email address.
 
+## DynamoDB Integration:
+
+The DynamoDB table is designed to store alarm data for analysis and troubleshooting. Each alarm is stored as an item in the table, with details about the alarm name, state change, reason, and timestamp.
+
+- Table Name: AlarmData
+- Partition Key: AlarmName (String)
+
+Data Stored:
+- AlarmName: The name of the alarm.
+- StateChange: The new state of the alarm (e.g., ALARM, OK).
+- Reason: The reason for the state change.
+- Timestamp: The time when the state change occurred.
+
+### Lambda Function:
+
+- Function Name: AlarmProcessorFunction
+- Runtime: nodejs20.x
+- Handler: alarmProcessor.handler
+
+The Lambda function processes incoming alarm notifications from SNS and stores them in the DynamoDB table. It is triggered whenever an alarm state changes and an SNS notification is published.
+
+Functionality
+
+1.	Receive SNS Notification:
+- The Lambda function is subscribed to the SNS topic that receives alarm notifications from CloudWatch.
+- When an alarm state changes, an SNS message is sent to the Lambda function.
+
+2.	Parse the SNS Message:
+- The Lambda function parses the SNS message to extract alarm details.
+- It logs the received event and checks for the presence of SNS records.
+
+3.	Store Alarm Data in DynamoDB:
+- The function constructs the item to be stored in DynamoDB using the extracted alarm details.
+- It then writes the item to the DynamoDB table.
+- Success and error logs are generated based on the outcome of the write operation.
+
+
 ## Contributing
 
 Contributions are welcome! Please fork the repository and submit a pull request with your proposed changes.
