@@ -128,7 +128,7 @@ Functionality
 - Success and error logs are generated based on the outcome of the write operation.
 
 
-## Cloud Monitoring App CI/CD Pipeline
+## CI/CD Pipeline
 This repository contains the configuration for a CI/CD pipeline for the Cloud Monitoring App, using AWS CDK, CodePipeline, and CodeBuild. The pipeline is set up to automatically deploy the application whenever changes are pushed to the GitHub repository.
 
 ### Prerequisites
