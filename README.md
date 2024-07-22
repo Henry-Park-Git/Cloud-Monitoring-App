@@ -155,7 +155,7 @@ This file defines the build specification for AWS CodeBuild. It specifies the co
 ### File Structure
 
 The key files related to the CI/CD pipeline are organized as follows:
-
+```
 Cloud-Monitoring-App/
 ├── bin/
 │ └── web-crawler.js
@@ -164,6 +164,7 @@ Cloud-Monitoring-App/
 │ └── web-crawler-pipeline-stack.js
 ├── buildspec.yml
 └── package.json
+```
 
 ### Pipeline Workflow
 
