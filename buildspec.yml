@@ -4,13 +4,17 @@ phases:
   install:
     runtime-versions:
       nodejs: 18
+  pre_build:
     commands:
+      - echo Installing source NVM
+      - . $NVM_DIR/nvm.sh
+      - nvm install 18
+      - nvm use 18
+      - node --version
       - npm install
   build:
     commands:
       - npx cdk synth --output cdk.out
-
-artifacts:
-  files:
-    - '**/*'
-  base-directory: 'cdk.out'
+  post_build:
+    commands:
+      - echo Build completed on `date`
