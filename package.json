@@ -5,7 +5,7 @@
     "web-crawler": "bin/web-crawler.js"
   },
   "scripts": {
-    "build": "echo \"The build step is not required when using JavaScript!\" && exit 0",
+    "build": "mkdir -p dist && cp -R src/* dist/",
     "cdk": "cdk",
     "test": "jest"
   },
