@@ -7,18 +7,14 @@ phases:
     commands:
       - echo "Installing dependencies..."
       - npm install
-
   pre_build:
     commands:
       - echo "Running pre-build steps..."
-      - npm install
-
   build:
     commands:
       - echo "Compiling the source..."
       - npm run build
       - if [ $? -ne 0 ]; then echo "Build failed with errors"; exit 1; fi
-
   post_build:
     commands:
       - echo "Build completed"
@@ -27,12 +23,15 @@ phases:
 artifacts:
   files:
     - '**/*'
-  base-directory: 'build/output'  # Modify this according to where your build outputs its files
+  # Make sure this path actually exists in your build environment
+  base-directory: 'build/output'
 
 reports:
-  build-reports:  # This section is optional, depends on if you have specific reports generated
+  # This should correspond to a real directory that contains test reports if you have any
+  build-reports:
     files:
       - '**/*'
-    base-directory: 'build/reports'  # Adjust if your project generates specific reports
+    # Adjust this if your project generates reports, otherwise, this can be omitted if not needed
+    base-directory: 'build/reports'
 
-on-failure: ABORT  # This ensures that the build stops if any phase fails, enhancing the error logging
+on-failure: ABORT  # Ensures that the build stops if a phase fails
