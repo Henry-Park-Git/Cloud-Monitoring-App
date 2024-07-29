@@ -4,25 +4,14 @@ phases:
   install:
     runtime-versions:
       nodejs: 20
-    commands:
-      - echo "Installing dependencies..."
-      - npm install
   pre_build:
     commands:
       - echo "Running pre-build steps..."
   build:
     commands:
       - echo "Compiling the source..."
+      - npm install
       - npm run build
-      - if [ $? -ne 0 ]; then echo "Build failed with errors"; exit 1; fi
   post_build:
     commands:
       - echo "Build completed"
-      - if [ $? -ne 0 ]; then echo "Post-build step failed"; fi
-
-artifacts:
-  files:
-    - '**/*'
-  base-directory: 'dist'  # 결과물이 저장되는 폴더
-
-# 아티팩트나 리포트를 생성하지 않는 경우 이 섹션은 삭제
