@@ -4,14 +4,35 @@ phases:
   install:
     runtime-versions:
       nodejs: 20
+    commands:
+      - echo "Installing dependencies..."
+      - npm install
+
   pre_build:
     commands:
       - echo "Running pre-build steps..."
+      - npm install
+
   build:
     commands:
       - echo "Compiling the source..."
-      - npm install
       - npm run build
+      - if [ $? -ne 0 ]; then echo "Build failed with errors"; exit 1; fi
+
   post_build:
     commands:
       - echo "Build completed"
+      - if [ $? -ne 0 ]; then echo "Post-build step failed"; fi
+
+artifacts:
+  files:
+    - '**/*'
+  base-directory: 'build/output'  # Modify this according to where your build outputs its files
+
+reports:
+  build-reports:  # This section is optional, depends on if you have specific reports generated
+    files:
+      - '**/*'
+    base-directory: 'build/reports'  # Adjust if your project generates specific reports
+
+on-failure: ABORT  # This ensures that the build stops if any phase fails, enhancing the error logging
