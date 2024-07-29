@@ -2,20 +2,16 @@ version: 0.2
 
 phases:
   install:
-    commands:
-      - echo "Installing NVM and setting up Node.js environment"
-      - curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
-      - . $HOME/.nvm/nvm.sh
-      - nvm install 18
-      - nvm use 18
-      - node --version
-      - npm install
+    runtime-versions:
+      nodejs: 20
   pre_build:
     commands:
-      - echo "Pre-build steps..."
+      - echo "Running pre-build steps..."
   build:
     commands:
-      - npx cdk synth --output cdk.out
+      - echo "Compiling the source..."
+      - npm install
+      - npm run build
   post_build:
     commands:
-      - echo "Post-build steps..."
+      - echo "Build completed"
