@@ -23,15 +23,6 @@ phases:
 artifacts:
   files:
     - '**/*'
-  # Make sure this path actually exists in your build environment
-  base-directory: 'build/output'
+  base-directory: 'dist'  # 결과물이 저장되는 폴더
 
-reports:
-  # This should correspond to a real directory that contains test reports if you have any
-  build-reports:
-    files:
-      - '**/*'
-    # Adjust this if your project generates reports, otherwise, this can be omitted if not needed
-    base-directory: 'build/reports'
-
-on-failure: ABORT  # Ensures that the build stops if a phase fails
+# 아티팩트나 리포트를 생성하지 않는 경우 이 섹션은 삭제
