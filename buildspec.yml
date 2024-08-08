@@ -4,6 +4,8 @@ phases:
   install:
     runtime-versions:
       nodejs: 20
+    commands:
+      - npm install -g aws-cdk  # Install AWS CDK CLI globally
   pre_build:
     commands:
       - echo "Running pre-build steps..."
@@ -11,8 +13,8 @@ phases:
     commands:
       - echo "Compiling the source..."
       - npm install
-      - cdk bootstrap
-      - cdk deploy --require-approval never
+      - cdk bootstrap  # Initialize your CDK app in the AWS environment
+      - cdk deploy --require-approval never  # Deploy without manual approvals
   post_build:
     commands:
       - echo "Build completed"
