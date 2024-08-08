@@ -11,8 +11,7 @@ phases:
     commands:
       - echo "Compiling the source..."
       - npm install
-      - cdk bootstrap
-      - cdk deploy --require-approval never
+      - npm run build
   post_build:
     commands:
       - echo "Build completed"
