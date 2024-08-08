@@ -6,9 +6,12 @@ phases:
       nodejs: 20
     commands:
       - npm install -g aws-cdk  # Install AWS CDK CLI globally
+      - npm install -g aws-sdk  # Ensure AWS SDK is globally available if needed
   pre_build:
     commands:
       - echo "Running pre-build steps..."
+      - aws --version  # Output AWS CLI version for debugging
+      - cdk --version  # Output CDK CLI version for debugging
   build:
     commands:
       - echo "Compiling the source..."
