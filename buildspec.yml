@@ -15,7 +15,6 @@ phases:
   build:
     commands:
       - echo "Compiling the source..."
-      - npm install
       - cdk bootstrap  # Initialize your CDK app in the AWS environment
       - cdk deploy --require-approval never  # Deploy without manual approvals
   post_build:
