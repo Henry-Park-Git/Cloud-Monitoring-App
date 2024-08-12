@@ -10,8 +10,9 @@ phases:
   build:
     commands:
       - echo "Compiling the source..."
+      - npm install -g aws-cdk
       - npm install
-      - cdk deploy --require-approval never
+      - cdk synth WebCrawlerStack --json > WebCrawlerStack.json
   post_build:
     commands:
       - echo "Build completed"
