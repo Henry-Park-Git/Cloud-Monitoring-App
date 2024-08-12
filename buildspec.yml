@@ -12,7 +12,6 @@ phases:
       - echo "Compiling the source..."
       - npm install -g aws-cdk
       - npm install
-      - cdk bootstrap 
       - cdk synth --json
   post_build:
     commands:
