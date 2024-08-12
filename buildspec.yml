@@ -12,7 +12,7 @@ phases:
       - echo "Compiling the source..."
       - npm install -g aws-cdk
       - npm install
-      - cdk synth --json
+      - cdk synth WebCrawlerStack --json > WebCrawlerStack.json
   post_build:
     commands:
       - echo "Build completed"
