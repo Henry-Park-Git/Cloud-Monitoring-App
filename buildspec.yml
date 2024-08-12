@@ -11,7 +11,8 @@ phases:
     commands:
       - echo "Compiling the source..."
       - npm install
-      - npm run build
+      - cdk bootstrap 
+      - cdk synth --json
   post_build:
     commands:
       - echo "Build completed"
