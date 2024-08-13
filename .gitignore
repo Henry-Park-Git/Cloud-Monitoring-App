@@ -1,5 +1,4 @@
 node_modules
-!canary/node_modules
 # CDK asset staging directory
 .cdk.staging
 cdk.out
