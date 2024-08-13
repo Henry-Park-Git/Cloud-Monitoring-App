@@ -16,6 +16,8 @@ phases:
   post_build:
     commands:
       - echo "Build completed"
+      - pwd
+      - ls -la
 artifacts:
   files:
     - WebCrawlerStack.json
