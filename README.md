@@ -208,4 +208,4 @@ The `cdk.json` file defines configurations for the CDK Toolkit.
 - `cdk deploy`: Deploys this stack to your default AWS account/region.
 - `cdk diff`: Compares deployed stack with the current state.
 - `cdk synth`: Emits the synthesized CloudFormation template.
-
+- `node fetch-s3-data.js`: To fetch data from s3.
