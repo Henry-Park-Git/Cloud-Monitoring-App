@@ -28,6 +28,7 @@ Before running this project, ensure you have the following installed and configu
 - Node.js: JavaScript runtime environment.
 - AWS CLI: Configured with appropriate IAM permissions.
 - AWS CDK: Installed globally on your development machine.
+- Jest: Testing framwork for Unit tests.
 
 ## Getting Started
 
@@ -50,13 +51,18 @@ Before running this project, ensure you have the following installed and configu
    aws configure
    ```
 
-4. Deploy Stack: Deploy the CDK stack to your AWS account.
+4. Perform testing: Perform unit tests on aws resources to make sure they are created with appropriate requirements.
+```bash
+npm test
+```
+
+5. Deploy Stack: Deploy the CDK stack to your AWS account.
 
    ```bash
    cdk deploy
    ```
 
-5. Monitor and Manage: Explore the deployed resources in your AWS Management Console. Use `cdk destroy` to remove the stack when no longer needed.
+6. Monitor and Manage: Explore the deployed resources in your AWS Management Console. Use `cdk destroy` to remove the stack when no longer needed.
 
 ## Adding Alarms
 
