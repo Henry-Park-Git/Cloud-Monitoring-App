@@ -5,4 +5,4 @@ const { WebCrawlerPipelineStack } = require('../lib/web-crawler-pipeline-stack')
 
 const app = new cdk.App();
 new WebCrawlerStack(app, 'WebCrawlerStack');
-// new WebCrawlerPipelineStack(app, 'WebCrawlerPipelineStack');
+new WebCrawlerPipelineStack(app, 'WebCrawlerPipelineStack');
