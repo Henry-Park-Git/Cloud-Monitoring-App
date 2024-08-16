@@ -10,7 +10,7 @@ phases:
       - echo "Installing the dependencies..."
       - npm install
       - echo "Installing the testing dependencies..."
-      - npm install --save-dev jest @aws-cdk/assertions
+      - npm install jest @aws-cdk/assertions
   pre_build:
     commands:
       - echo "Running unit tests..."
