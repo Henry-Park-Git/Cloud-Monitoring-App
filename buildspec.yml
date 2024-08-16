@@ -14,7 +14,7 @@ phases:
   pre_build:
     commands:
       - echo "Running unit tests..."
-      - npm test
+      - npm run test
   build:
     commands:
       - echo "Compiling the source..."
