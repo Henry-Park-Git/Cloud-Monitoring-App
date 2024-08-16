@@ -14,8 +14,8 @@ phases:
       - echo "Installing the assertion dependencies..."
       - npm install @aws-cdk/assertions
       - echo "Check Jest version..."
-      - npm list jest
       - ls node_modules/.bin/jest
+      - npm list jest
 
   pre_build:
     commands:
