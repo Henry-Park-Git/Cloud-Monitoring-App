@@ -4,14 +4,18 @@ phases:
   install:
     runtime-versions:
       nodejs: 20
+    commands:
+      - echo "Installing the AWS CDK CLI..."
+      - npm install -g aws-cdk
+      - echo "Installing the dependencies..."
+      - npm install
   pre_build:
     commands:
-      - echo "Running pre-build steps..."
+      - echo "Running unit tests..."
+      - npm test
   build:
     commands:
       - echo "Compiling the source..."
-      - npm install -g aws-cdk
-      - npm install
       - cdk synth WebCrawlerStack --json > WebCrawlerStack.json
   post_build:
     commands:
