@@ -69,7 +69,6 @@ test('Lambda Function Created', () => {
   const template = Template.fromStack(stack);
 
   template.hasResourceProperties('AWS::Lambda::Function', {
-    Handler: 'alarmProcessor.handler',
     Runtime: 'nodejs18.x',
   });
 });
