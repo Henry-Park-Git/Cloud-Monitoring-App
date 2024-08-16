@@ -9,16 +9,13 @@ phases:
       - npm install -g aws-cdk
       - echo "Installing the dependencies..."
       - npm install
-      - echo "Installing the testing dependencies..."
-      - npm install jest
-      - echo "Installing the assertion dependencies..."
-      - npm install @aws-cdk/assertions
-      - echo "Check Jest version..."
 
   pre_build:
     commands:
       - echo "Running unit tests..."
       - npm run test
+      - echo "Fetching urls from S3..."
+      - node fetch-s3-data.js
   build:
     commands:
       - echo "Compiling the source..."
