@@ -7,7 +7,7 @@
   "scripts": {
     "build": "echo \"The build step is not required when using JavaScript!\" && exit 0",
     "cdk": "cdk",
-    "test": "jest"
+    "test": "npx jest"
   },
   "devDependencies": {
     "@aws-cdk/assertions": "^1.204.0",
