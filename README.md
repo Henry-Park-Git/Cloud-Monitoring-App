@@ -1,211 +1,184 @@
 # Cloud Monitoring App
 
-This project monitors and notifies the status of web applications using AWS services like CloudWatch, Synthetics, and SNS.
+> Synthetic uptime and latency monitoring for a configurable list of websites, built entirely as AWS CDK infrastructure-as-code, with its own self-deploying CI/CD pipeline.
 
-## Description
+## Overview
 
-This project sets up a monitoring system for web applications using AWS CDK. It creates a synthetic canary to periodically check the status of a website and sends notifications if the site is down.
+Cloud Monitoring App watches a list of external websites, checks that each one loads successfully, and measures how long it takes — without any always-on server to maintain. A CloudWatch Synthetics canary runs headless Chrome (Puppeteer) on a schedule, and CloudWatch Alarms turn "site is slow" or "site is down" into a notification within minutes.
 
-## Features
+What makes it more than a wrapper around a canary is the rest of the system built around that one signal: the monitored URL list is decoupled from the code so sites can be added without a deploy, every alarm state change is persisted to DynamoDB for a durable audit trail (not just a fleeting email), and the whole thing ships through its own CDK-defined CodePipeline with a test gate and a manual approval step before production.
 
-- Synthetic Canary: Utilizes AWS Synthetics to simulate user interactions and monitor key performance metrics.
-- CloudWatch Alarms: Sets up alarms based on availability and latency metrics to proactively detect issues.
-- SNS Notifications: Sends alerts through AWS SNS to subscribed endpoints such as email.
+## Tech Stack
+
+**Infrastructure as Code**
+- AWS CDK (`aws-cdk-lib` v2) in JavaScript — one CDK app, two independently deployable stacks
+
+**Monitoring**
+- AWS CloudWatch Synthetics (Puppeteer runtime `syn-nodejs-puppeteer-7.0`) — the canary
+- AWS CloudWatch Metrics & Alarms
+- `@aws-sdk/client-cloudwatch` (v3) — used inside the canary to publish custom metrics
+
+**Compute & Messaging**
+- AWS Lambda (Node.js 18.x) — alarm processor
+- AWS SNS — alarm fan-out (email + Lambda subscriptions)
+- `aws-sdk` (v2) — DynamoDB DocumentClient in the Lambda, S3 client in the config-fetch script
+
+**Data & Storage**
+- Amazon DynamoDB — alarm state-change history
+- Amazon S3 — canary screenshot/log artifacts, and the externally-hosted `urls.json` target list
+
+**CI/CD**
+- AWS CodePipeline + CodeBuild, GitHub source action, manual approval gate
+
+**Testing**
+- Jest + `@aws-cdk/assertions` — assertions against the synthesized CloudFormation template, not just unit logic
+
+## Key Features
+
+- **Multi-site monitoring from one canary** — the canary reads a name→URL map at runtime and loops over every entry, so it scales to any number of monitored sites without adding new CDK resources per site.
+- **Target list decoupled from source** — `urls.json` is fetched from S3 (`fetch-s3-data.js`) before the stack synthesizes, so operators can add or remove a monitored site without touching code or waiting for a PR.
+- **Per-site alarms generated dynamically** — for every URL, the stack derives an availability alarm (success rate < 90%) and a latency alarm (> 3000 ms) from a shared metrics factory ([`lib/metrics.js`](lib/metrics.js)), keeping alarm definitions consistent as the URL list grows.
+- **Two-channel alerting with a durable trail** — a single SNS topic fans out to both a human (email) and a Lambda function, so a failure produces an immediate notification *and* a permanent DynamoDB record of what changed and why.
+- **Health metrics on the canary itself** — beyond per-site availability/latency, the canary publishes its own `TimeToProcess` and `MemoryUsage`, each with its own alarm, so a slow or resource-heavy canary run is caught independently of the sites it's checking.
+- **Infrastructure tested like application code** — CDK assertions verify the synthesized CloudFormation (bucket naming, canary schedule/runtime, table keys, alarm thresholds) in CI before every deploy, not after.
 
 ## Architecture
 
-The application architecture includes:
+```
+ urls.json (S3: target site list)
+        │  fetched pre-build by fetch-s3-data.js
+        ▼
+ ┌───────────────────────────────────────────┐
+ │  WebCrawlerStack (CDK)                     │
+ │                                             │
+ │  Synthetics Canary — every 2 minutes        │
+ │  Puppeteer: goto → screenshot → timing  ────┼──▶ CloudWatch Metrics
+ │                                             │    (Availability, Latency per URL,
+ │                                             │     TimeToProcess, MemoryUsage)
+ └───────────────────┬─────────────────────────┘
+                      │ per-URL alarms built from lib/metrics.js
+                      ▼
+            CloudWatch Alarms
+            (Availability < 90%  ·  Latency > 3000ms
+             TimeToProcess > 10s  ·  MemoryUsage > 100MB)
+                      │ ALARM state
+                      ▼
+              SNS Topic (AlarmTopic)
+               ├──────────────┐
+               ▼              ▼
+        Email subscriber   AlarmProcessorFunction (Lambda)
+                                    │
+                                    ▼
+                          DynamoDB table `AlarmData`
+                          (AlarmName, StateChange, Reason, Timestamp)
+```
 
-- AWS CDK Stack: Defines infrastructure as code using JavaScript for provisioning AWS resources.
-- Synthetic Canary: A Lambda function periodically performs checks on predefined URLs.
-- CloudWatch Metrics: Captures availability and latency metrics for monitoring purposes.
-- SNS Topic: Receives alarms triggered by CloudWatch and sends notifications to subscribed endpoints.
+A second, independent stack owns delivery:
 
-## Prerequisites
+```
+ GitHub push (main)
+        ▼
+ CodePipeline
+   Source ──▶ Build_and_Test ──▶ Manual Approval ──▶ Prod Deploy
+              (CodeBuild:                              (CloudFormation
+               npm test,                                 create/update via
+               fetch-s3-data.js,                          a scoped
+               cdk synth)                                 DeploymentRole)
+```
 
-Before running this project, ensure you have the following installed and configured:
+**Key design decisions**
 
-- Node.js: JavaScript runtime environment.
-- AWS CLI: Configured with appropriate IAM permissions.
-- AWS CDK: Installed globally on your development machine.
-- Jest: Testing framwork for Unit tests.
+- **Two stacks from one CDK app, not one.** `WebCrawlerStack` (the monitoring resources) and `WebCrawlerPipelineStack` (the delivery mechanism) are deployed independently from [`bin/web-crawler.js`](bin/web-crawler.js). A change to the pipeline's build image or approval flow never forces a canary redeploy, and vice versa.
+- **Config lives in S3, not in git.** The monitored-site list could have been hardcoded in the stack; instead it's pulled from S3 at build time. That means non-engineers can change what's monitored without a code review, at the cost of one step that lives outside version control — a deliberate trade-off between change velocity and auditability.
+- **A metrics factory instead of per-URL boilerplate.** [`lib/metrics.js`](lib/metrics.js) centralises the CloudWatch namespace/dimension definitions used by every alarm. Without it, the `forEach` over URLs in [`lib/web-crawler-stack.js`](lib/web-crawler-stack.js) would duplicate metric wiring for each site and drift out of sync as sites are added.
+- **Alarm history is fanned out from SNS, not bolted onto the alarm.** Rather than teaching the canary or the alarm itself to write to a database, a single SNS topic delivers the same event to both an email subscriber and the `AlarmProcessorFunction` Lambda. Notification and persistence are independent concerns that can fail or be extended separately.
+- **Least-privilege cross-role trust in the pipeline.** The pipeline's own execution role (`PipelineRole`) doesn't get admin rights to deploy — instead a separate `DeploymentRole` is created with an explicit `sts:AssumeRole` trust statement scoped to `PipelineRole`, and only that role touches CloudFormation in production.
+- **A human gate between tests passing and production.** Unit tests run automatically in `pre_build` (so broken infra fails fast), but the `Code_Review` manual approval action still has to be actioned before `Prod_Deploy` runs — CI catches regressions, a person authorises the production change.
+
+## How It Works
+
+The canary is the core of the system, so it's worth walking through end to end (implementation in [`canary/nodejs/node_modules/index.js`](canary/nodejs/node_modules/index.js) — it lives under `node_modules` because that's the path AWS Synthetics' custom-runtime packaging convention expects the canary script to be discoverable from):
+
+1. **Trigger.** CloudWatch Synthetics invokes the canary handler every 2 minutes (`synthetics.Schedule.rate(Duration.minutes(2))`), passing the URL map in via the `URLS` environment variable set by the CDK stack.
+2. **Visit each site.** For every `[name, url]` pair, the canary opens a Synthetics-managed Puppeteer page, navigates with a 30-second timeout, and takes a screenshot on load — these screenshots land in the artifact S3 bucket for manual inspection.
+3. **Check the response.** If the page doesn't return HTTP 200, the canary throws. AWS Synthetics records that as a failed canary run, which drives the `_Availability` metric to 0 for that URL.
+4. **Measure latency.** On success, it reads the browser's Navigation Timing API (`performance.timing`) to compute `responseEnd - requestStart` as the page's load latency.
+5. **Publish per-site metrics.** Both the availability outcome and the latency value are pushed to CloudWatch under the `CloudWatchSynthetics` namespace, dimensioned by `URL`, via the AWS SDK v3 `PutMetricDataCommand` — these are the exact metrics `lib/metrics.js` builds the per-URL alarms from.
+6. **Publish run-level health metrics.** After the loop, the canary also reports its own total `TimeToProcess` and `MemoryUsage` for that run, each backed by its own alarm — so a canary that's degrading (e.g. from a growing URL list) is caught even if every individual site is healthy.
+7. **Alarm → notify → persist.** If any alarm crosses its threshold, CloudWatch publishes to the `AlarmTopic`. The email subscriber gets a human-readable alert; the `AlarmProcessorFunction` Lambda parses the same SNS message and writes an `AlarmName` / `StateChange` / `Reason` / `Timestamp` record to the `AlarmData` DynamoDB table, defensively checking for the required environment variable and SNS records before touching the table.
 
 ## Getting Started
 
-1. Clone Repository: Clone this repository to your local machine.
-   
-   ```bash
-   git clone <repository-url>
-   cd Cloud-Monitoring-App
-   ```
+**Prerequisites**
+- Node.js
+- AWS CLI, configured with credentials that can create the resources above
+- AWS CDK CLI (`npm install -g aws-cdk`)
+- An AWS account [bootstrapped for CDK](https://docs.aws.amazon.com/cdk/v2/guide/bootstrapping.html)
 
-2. Install Dependencies: Install project dependencies using npm.
+**Install**
 
-   ```bash
-   npm install
-   ```
+```bash
+git clone https://github.com/Henry-Park-Git/Cloud-Monitoring-App.git
+cd Cloud-Monitoring-App
+npm install
+```
 
-3. Configure AWS CLI: Ensure your AWS CLI is configured with credentials that have permissions to deploy AWS resources.
+**Configure**
 
-   ```bash
-   aws configure
-   ```
+The monitoring stack reads `urls.json` from the project root at synth time. A sample file with five public URLs is committed so the stack synthesizes out of the box; to point it at your own S3-hosted config, run:
 
-4. Perform testing: Perform unit tests on aws resources to make sure they are created with appropriate requirements.
+```bash
+node fetch-s3-data.js
+```
+
+(update the bucket/key in [`fetch-s3-data.js`](fetch-s3-data.js) to your own bucket first). You'll also want to update the S3 bucket name in `web-crawler-stack.js` and the alarm notification email/GitHub source details in the two stack files to match your own environment before deploying.
+
+**Test**
+
 ```bash
 npm test
 ```
 
-5. Deploy Stack: Deploy the CDK stack to your AWS account.
+Runs the Jest suite in [`test/web-crawler.test.js`](test/web-crawler.test.js), which asserts on the synthesized CloudFormation template rather than mocking AWS.
 
-   ```bash
-   cdk deploy
-   ```
+**Deploy**
 
-6. Monitor and Manage: Explore the deployed resources in your AWS Management Console. Use `cdk destroy` to remove the stack when no longer needed.
-
-## Adding Alarms
-
-This project includes CloudWatch Alarms to notify you of issues detected by the synthetic canary.
-
-### Canary Failure Alarm
-
-Triggers when the synthetic canary detects a failure.
-
-## How It Works
-
-### Synthetic Canary
-
-Periodically checks the status of configured websites.
-
-### CloudWatch Alarms Overview
-
-The stack sets up two types of CloudWatch Alarms:
-
-Availability Alarm: Monitors the success rate of the canary.
-
-Metric: SuccessPercent
-Condition: Triggers when the success percentage is less than 90% over a period of 5 minutes.
-Actions: Sends notifications to an SNS topic subscribed via email or other endpoints.
-Latency Alarm: Monitors the latency of the canary.
-
-Metric: Duration
-Condition: Triggers when the latency exceeds 3 seconds (3000 milliseconds).
-Actions: Sends notifications to an SNS topic subscribed via email or other endpoints.
-
-### SNS Topic
-
-Sends notifications to the subscribed email address.
-
-## DynamoDB Integration:
-
-The DynamoDB table is designed to store alarm data for analysis and troubleshooting. Each alarm is stored as an item in the table, with details about the alarm name, state change, reason, and timestamp.
-
-- Table Name: AlarmData
-- Partition Key: AlarmName (String)
-
-Data Stored:
-- AlarmName: The name of the alarm.
-- StateChange: The new state of the alarm (e.g., ALARM, OK).
-- Reason: The reason for the state change.
-- Timestamp: The time when the state change occurred.
-
-### Lambda Function:
-
-- Function Name: AlarmProcessorFunction
-- Runtime: nodejs20.x
-- Handler: alarmProcessor.handler
-
-The Lambda function processes incoming alarm notifications from SNS and stores them in the DynamoDB table. It is triggered whenever an alarm state changes and an SNS notification is published.
-
-Functionality
-
-1.	Receive SNS Notification:
-- The Lambda function is subscribed to the SNS topic that receives alarm notifications from CloudWatch.
-- When an alarm state changes, an SNS message is sent to the Lambda function.
-
-2.	Parse the SNS Message:
-- The Lambda function parses the SNS message to extract alarm details.
-- It logs the received event and checks for the presence of SNS records.
-
-3.	Store Alarm Data in DynamoDB:
-- The function constructs the item to be stored in DynamoDB using the extracted alarm details.
-- It then writes the item to the DynamoDB table.
-- Success and error logs are generated based on the outcome of the write operation.
-
-
-## CI/CD Pipeline
-This repository contains the configuration for a CI/CD pipeline for the Cloud Monitoring App, using AWS CDK, CodePipeline, and CodeBuild. The pipeline is set up to automatically deploy the application whenever changes are pushed to the GitHub repository.
-
-### Prerequisites
-
-Before setting up the pipeline, ensure you have the following prerequisites:
-
-- AWS CLI configured with appropriate permissions
-- AWS CDK installed
-- Node.js and npm installed
-- GitHub personal access token stored in AWS Secrets Manager
-- An S3 bucket for storing build artifacts
-
-### lib/web-crawler-pipeline-stack.js's Architecture
-
-This file defines the CI/CD pipeline stack. The stack includes the following stages:
-
-1. **Source Stage**: Monitors the GitHub repository for changes.
-2. **Build Stage**: Uses AWS CodeBuild to install dependencies and synthesize the CDK stack.
-3. **Deploy Stage**: Deploys the synthesized CloudFormation stack using AWS CodePipeline.
-
-### buildspec.yml
-This file defines the build specification for AWS CodeBuild. It specifies the commands to install dependencies and synthesize the CDK stack.
-
-### File Structure
-
-The key files related to the CI/CD pipeline are organized as follows:
-```
-Cloud-Monitoring-App/
-├── bin/
-│ └── web-crawler.js
-├── lib/
-│ ├── web-crawler-stack.js
-│ └── web-crawler-pipeline-stack.js
-├── buildspec.yml
-└── package.json
+```bash
+cdk deploy WebCrawlerStack          # canary, alarms, SNS, DynamoDB
+cdk deploy WebCrawlerPipelineStack  # optional: self-deploying CI/CD pipeline
 ```
 
-### Pipeline Workflow
+**Tear down**
 
-1. Source Stage:
-- Monitors the main branch of the Cloud-Monitoring-App repository on GitHub.
-- Uses a GitHub personal access token stored in AWS Secrets Manager (github-token) for authentication.
+```bash
+cdk destroy WebCrawlerStack
+```
 
-2. Build Stage:
-- Executes the commands defined in buildspec.yml to install dependencies and synthesize the CDK stack.
-- Outputs the synthesized CloudFormation templates to the cdk.out directory.
+**Other useful commands**
 
-3. Deploy Stage:
-- Uses the synthesized CloudFormation template to update the CloudFormation stack.
-- Deploys the stack defined in lib/web-crawler-stack.js.
+| Command | Purpose |
+|---|---|
+| `cdk diff` | Compare the deployed stack against local changes |
+| `cdk synth` | Emit the synthesized CloudFormation template |
+| `node fetch-s3-data.js` | Refresh `urls.json` from S3 |
 
+## Notable Engineering Decisions / Challenges
 
-## Contributing
+- **Scaling alarms with the URL list, not against it.** Hardcoding one alarm pair per site would mean editing the stack every time a site is added or removed. Deriving `this.urlNames` from `urls.json` and looping alarm creation over it means the number of monitored sites is a data change, not a code change — the trade-off is that the stack's resource count (and CloudFormation deploy time) grows with the URL list, which is worth watching as it scales.
+- **Decoupling "what to monitor" from "how to monitor it."** Fetching `urls.json` from S3 as a pre-build step (wired into `buildspec.yml`) rather than committing target URLs directly keeps the deployable artifact reproducible from git while still letting the monitored set change independently — a common pattern for separating config from code, applied here to infrastructure rather than an application.
+- **Turning ephemeral alarms into queryable history.** CloudWatch alarms are transient by nature — they tell you the *current* state, not what happened last week. Subscribing a Lambda to the same SNS topic that emails a human, and having it write structured records to DynamoDB, turns every state change into a queryable audit trail without touching the alarm or canary definitions.
+- **Testing infrastructure definitions, not just application logic.** The Jest suite doesn't unit test business logic — the project barely has any — it asserts that `cdk synth` actually produces the resources the design calls for (correct bucket naming pattern, canary schedule and runtime, table keys, Lambda runtime, SNS topic). That test suite is wired into `buildspec.yml`'s `pre_build` phase, so a broken CDK construct fails the pipeline before a CloudFormation deploy is even attempted.
+- **Separating "can run the pipeline" from "can deploy to production."** Rather than giving the CodePipeline's own role permission to update CloudFormation stacks directly, `web-crawler-pipeline-stack.js` creates a distinct `DeploymentRole` and wires an explicit `sts:AssumeRole` trust policy scoped to the pipeline role. It's more setup than a single admin role, but it keeps the blast radius of a compromised pipeline role limited to *triggering* a deploy, not *performing* one.
 
-Contributions are welcome! Please fork the repository and submit a pull request with your proposed changes.
+## Contributors
 
-## Acknowledgments
+Built collaboratively across several branches and pull requests by:
 
-- AWS CDK documentation and community for guidance and support.
-- Stack Overflow and AWS forums for troubleshooting assistance.
+- [Joseph Park](https://github.com/Joseph-Swift) ([Henry-Park-Git](https://github.com/Henry-Park-Git))
+- Raman Mor
+- Preety Nagpal
+- Tay Nguyen
 
-## Explore
+## License
 
-This project demonstrates a CDK app with an instance of a stack (`WebCrawlerStack`) that includes the setup of synthetic canaries and associated alarms.
-
-The `cdk.json` file defines configurations for the CDK Toolkit.
-
-## Useful commands
-
-- `npm run test`: Runs Jest unit tests.
-- `cdk deploy`: Deploys this stack to your default AWS account/region.
-- `cdk diff`: Compares deployed stack with the current state.
-- `cdk synth`: Emits the synthesized CloudFormation template.
-- `node fetch-s3-data.js`: To fetch data from s3.
+MIT — see [LICENSE](LICENSE).
