@@ -125,13 +125,21 @@ npm install
 
 **Configure**
 
-The monitoring stack reads `urls.json` from the project root at synth time. A sample file with five public URLs is committed so the stack synthesizes out of the box; to point it at your own S3-hosted config, run:
+All environment-specific values (alarm email, S3 bucket, GitHub source) are read from environment variables or CDK context — nothing is hardcoded in source. Copy the example file and fill in your own values:
 
 ```bash
-node fetch-s3-data.js
+cp .env.example .env
+# then edit .env  (see the file for the full list of variables)
 ```
 
-(update the bucket/key in [`fetch-s3-data.js`](fetch-s3-data.js) to your own bucket first). You'll also want to update the S3 bucket name in `web-crawler-stack.js` and the alarm notification email/GitHub source details in the two stack files to match your own environment before deploying.
+| Variable | Used by | Purpose |
+|---|---|---|
+| `ALARM_EMAIL` | `WebCrawlerStack` | Address subscribed to SNS alarm notifications |
+| `URLS_BUCKET_NAME` | stack + `fetch-s3-data.js` | S3 bucket holding the monitored-URL list |
+| `GITHUB_OWNER` / `GITHUB_REPO` / `GITHUB_BRANCH` | `WebCrawlerPipelineStack` | Source repo the pipeline builds from |
+| `GITHUB_TOKEN_SECRET` | `WebCrawlerPipelineStack` | Name of the Secrets Manager secret holding the GitHub OAuth token |
+
+Each value can also be passed inline as CDK context, e.g. `cdk deploy -c alarmEmail=you@example.com`. Account and region are taken from your AWS profile (`CDK_DEFAULT_ACCOUNT` / `CDK_DEFAULT_REGION`). A sample `urls.json` with five public URLs is committed so the stack synthesizes out of the box; run `node fetch-s3-data.js` to replace it from your own S3 bucket.
 
 **Test**
 

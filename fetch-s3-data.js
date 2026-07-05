@@ -3,8 +3,9 @@ const fs = require('fs');
 const s3 = new AWS.S3();
 
 async function fetchData() {
-  const bucketName = 'my-monitoring-urls-bucket';
-  const key = 'urls.json';
+  // Configured via environment variable so no private bucket name is hardcoded.
+  const bucketName = process.env.URLS_BUCKET_NAME || 'my-monitoring-urls-bucket';
+  const key = process.env.URLS_OBJECT_KEY || 'urls.json';
 
   try {
     const data = await s3.getObject({ Bucket: bucketName, Key: key }).promise();

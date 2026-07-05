@@ -3,3 +3,12 @@ node_modules
 .cdk.staging
 cdk.out
 .DS_Store
+
+# Secrets & local environment — never commit these
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+aws.json
+credentials
