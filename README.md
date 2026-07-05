@@ -31,7 +31,7 @@ What makes it more than a wrapper around a canary is the rest of the system buil
 - AWS CodePipeline + CodeBuild, GitHub source action, manual approval gate
 
 **Testing**
-- Jest + `@aws-cdk/assertions` — assertions against the synthesized CloudFormation template, not just unit logic
+- Jest + `aws-cdk-lib/assertions` — assertions against the synthesized CloudFormation template, not just unit logic
 
 ## Key Features
 
@@ -110,9 +110,9 @@ The canary is the core of the system, so it's worth walking through end to end (
 ## Getting Started
 
 **Prerequisites**
-- Node.js
+- Node.js 18+
 - AWS CLI, configured with credentials that can create the resources above
-- AWS CDK CLI (`npm install -g aws-cdk`)
+- AWS CDK — pinned as a dev dependency, so `npx cdk …` works after `npm install` (no global install needed)
 - An AWS account [bootstrapped for CDK](https://docs.aws.amazon.com/cdk/v2/guide/bootstrapping.html)
 
 **Install**
@@ -152,22 +152,22 @@ Runs the Jest suite in [`test/web-crawler.test.js`](test/web-crawler.test.js), w
 **Deploy**
 
 ```bash
-cdk deploy WebCrawlerStack          # canary, alarms, SNS, DynamoDB
-cdk deploy WebCrawlerPipelineStack  # optional: self-deploying CI/CD pipeline
+npx cdk deploy WebCrawlerStack          # canary, alarms, SNS, DynamoDB
+npx cdk deploy WebCrawlerPipelineStack  # optional: self-deploying CI/CD pipeline
 ```
 
 **Tear down**
 
 ```bash
-cdk destroy WebCrawlerStack
+npx cdk destroy WebCrawlerStack
 ```
 
 **Other useful commands**
 
 | Command | Purpose |
 |---|---|
-| `cdk diff` | Compare the deployed stack against local changes |
-| `cdk synth` | Emit the synthesized CloudFormation template |
+| `npx cdk diff` | Compare the deployed stack against local changes |
+| `npx cdk synth` | Emit the synthesized CloudFormation template |
 | `node fetch-s3-data.js` | Refresh `urls.json` from S3 |
 
 ## Notable Engineering Decisions / Challenges
@@ -177,12 +177,13 @@ cdk destroy WebCrawlerStack
 - **Turning ephemeral alarms into queryable history.** CloudWatch alarms are transient by nature — they tell you the *current* state, not what happened last week. Subscribing a Lambda to the same SNS topic that emails a human, and having it write structured records to DynamoDB, turns every state change into a queryable audit trail without touching the alarm or canary definitions.
 - **Testing infrastructure definitions, not just application logic.** The Jest suite doesn't unit test business logic — the project barely has any — it asserts that `cdk synth` actually produces the resources the design calls for (correct bucket naming pattern, canary schedule and runtime, table keys, Lambda runtime, SNS topic). That test suite is wired into `buildspec.yml`'s `pre_build` phase, so a broken CDK construct fails the pipeline before a CloudFormation deploy is even attempted.
 - **Separating "can run the pipeline" from "can deploy to production."** Rather than giving the CodePipeline's own role permission to update CloudFormation stacks directly, `web-crawler-pipeline-stack.js` creates a distinct `DeploymentRole` and wires an explicit `sts:AssumeRole` trust policy scoped to the pipeline role. It's more setup than a single admin role, but it keeps the blast radius of a compromised pipeline role limited to *triggering* a deploy, not *performing* one.
+- **No environment-specific values baked into source.** The alarm recipient, S3 bucket, and GitHub source are all read from environment variables or CDK context (documented in [`.env.example`](.env.example)), while account and region come from the deploying CDK environment rather than being hardcoded. This keeps the repository safe to open-source and lets the same code deploy into any account without edits — configuration is kept separate from code. IAM policies are scoped the same way: the canary gets only the specific S3 actions it needs (not `s3:*`), and resource ARNs resolve to the deploying account rather than a fixed account ID.
 
 ## Contributors
 
 Built collaboratively across several branches and pull requests by:
 
-- [Joseph Park](https://github.com/Joseph-Swift) ([Henry-Park-Git](https://github.com/Henry-Park-Git))
+- [Henry Park](https://github.com/Henry-Park-Git) (Henry-Park-Git)
 - Raman Mor
 - Preety Nagpal
 - Tay Nguyen
