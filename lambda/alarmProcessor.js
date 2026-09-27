@@ -1,5 +1,7 @@
-const AWS = require('aws-sdk');
-const dynamodb = new AWS.DynamoDB.DocumentClient();
+const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+const { DynamoDBDocumentClient, PutCommand } = require('@aws-sdk/lib-dynamodb');
+
+const dynamodb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
 exports.handler = async (event) => {
   console.log('Received event:', JSON.stringify(event, null, 2));
@@ -57,7 +59,7 @@ exports.handler = async (event) => {
 
   // Put the item into DynamoDB
   try {
-    const result = await dynamodb.put(params).promise();
+    const result = await dynamodb.send(new PutCommand(params));
     console.log('Alarm data saved successfully', result);
     return {
       status: 'Success',

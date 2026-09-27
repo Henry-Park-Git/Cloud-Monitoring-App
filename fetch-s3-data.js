@@ -1,6 +1,6 @@
-const AWS = require('aws-sdk');
+const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
 const fs = require('fs');
-const s3 = new AWS.S3();
+const s3 = new S3Client({});
 
 async function fetchData() {
   // Configured via environment variable so no private bucket name is hardcoded.
@@ -8,8 +8,8 @@ async function fetchData() {
   const key = process.env.URLS_OBJECT_KEY || 'urls.json';
 
   try {
-    const data = await s3.getObject({ Bucket: bucketName, Key: key }).promise();
-    const urls = JSON.parse(data.Body.toString('utf-8'));
+    const data = await s3.send(new GetObjectCommand({ Bucket: bucketName, Key: key }));
+    const urls = JSON.parse(await data.Body.transformToString('utf-8'));
 
     // Write to a file or set as environment variable
     fs.writeFileSync('urls.json', JSON.stringify(urls));

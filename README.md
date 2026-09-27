@@ -19,9 +19,9 @@ What makes it more than a wrapper around a canary is the rest of the system buil
 - `@aws-sdk/client-cloudwatch` (v3) — used inside the canary to publish custom metrics
 
 **Compute & Messaging**
-- AWS Lambda (Node.js 18.x) — alarm processor
+- AWS Lambda (Node.js 22.x) — alarm processor
 - AWS SNS — alarm fan-out (email + Lambda subscriptions)
-- `aws-sdk` (v2) — DynamoDB DocumentClient in the Lambda, S3 client in the config-fetch script
+- `@aws-sdk/lib-dynamodb` / `@aws-sdk/client-s3` (v3) — DynamoDB document client in the Lambda, S3 client in the config-fetch script
 
 **Data & Storage**
 - Amazon DynamoDB — alarm state-change history
@@ -110,7 +110,7 @@ The canary is the core of the system, so it's worth walking through end to end (
 ## Getting Started
 
 **Prerequisites**
-- Node.js 18+
+- Node.js 20+
 - AWS CLI, configured with credentials that can create the resources above
 - AWS CDK — pinned as a dev dependency, so `npx cdk …` works after `npm install` (no global install needed)
 - An AWS account [bootstrapped for CDK](https://docs.aws.amazon.com/cdk/v2/guide/bootstrapping.html)
