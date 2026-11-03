@@ -1,3 +1,4 @@
+const { test } = require('node:test');
 const { App } = require('aws-cdk-lib');
 const { Template } = require('aws-cdk-lib/assertions');
 const { WebCrawlerStack } = require('../lib/web-crawler-stack'); 

@@ -31,7 +31,7 @@ What makes it more than a wrapper around a canary is the rest of the system buil
 - AWS CodePipeline + CodeBuild, GitHub source action, manual approval gate
 
 **Testing**
-- Jest + `aws-cdk-lib/assertions` — assertions against the synthesized CloudFormation template, not just unit logic
+- Node.js built-in test runner + `aws-cdk-lib/assertions` — assertions against the synthesized CloudFormation template, with no separate test framework
 
 ## Key Features
 
@@ -110,9 +110,9 @@ The canary is the core of the system, so it's worth walking through end to end (
 ## Getting Started
 
 **Prerequisites**
-- Node.js 20+
+- Node.js 22+ (`nvm use` selects the version in `.nvmrc`)
 - AWS CLI, configured with credentials that can create the resources above
-- AWS CDK — pinned as a dev dependency, so `npx cdk …` works after `npm install` (no global install needed)
+- AWS CDK — pinned as a dev dependency, so `npx cdk …` works after installation (no global install needed)
 - An AWS account [bootstrapped for CDK](https://docs.aws.amazon.com/cdk/v2/guide/bootstrapping.html)
 
 **Install**
@@ -120,8 +120,11 @@ The canary is the core of the system, so it's worth walking through end to end (
 ```bash
 git clone https://github.com/Henry-Park-Git/Cloud-Monitoring-App.git
 cd Cloud-Monitoring-App
-npm install
+npm ci --include=dev
+npm ci --prefix lambda --omit=dev
 ```
+
+Install the Lambda dependencies before synthesizing or deploying: CDK packages the `lambda/` directory as the function asset. Both CI systems run these same locked installs.
 
 **Configure**
 
@@ -135,11 +138,11 @@ cp .env.example .env
 | Variable | Used by | Purpose |
 |---|---|---|
 | `ALARM_EMAIL` | `WebCrawlerStack` | Address subscribed to SNS alarm notifications |
-| `URLS_BUCKET_NAME` | stack + `fetch-s3-data.js` | S3 bucket holding the monitored-URL list |
+| `URLS_BUCKET_NAME` | `fetch-s3-data.js` | S3 bucket holding the monitored-URL list |
 | `GITHUB_OWNER` / `GITHUB_REPO` / `GITHUB_BRANCH` | `WebCrawlerPipelineStack` | Source repo the pipeline builds from |
 | `GITHUB_TOKEN_SECRET` | `WebCrawlerPipelineStack` | Name of the Secrets Manager secret holding the GitHub OAuth token |
 
-Each value can also be passed inline as CDK context, e.g. `cdk deploy -c alarmEmail=you@example.com`. Account and region are taken from your AWS profile (`CDK_DEFAULT_ACCOUNT` / `CDK_DEFAULT_REGION`). A sample `urls.json` with five public URLs is committed so the stack synthesizes out of the box; run `node fetch-s3-data.js` to replace it from your own S3 bucket.
+Stack configuration can also be passed inline as CDK context, e.g. `cdk deploy -c alarmEmail=you@example.com`. The S3 fetch script reads `URLS_BUCKET_NAME` and `URLS_OBJECT_KEY` from environment variables. Account and region are taken from your AWS profile (`CDK_DEFAULT_ACCOUNT` / `CDK_DEFAULT_REGION`). A sample `urls.json` with five public URLs is committed so the stack synthesizes out of the box; run `node fetch-s3-data.js` to replace it from your own S3 bucket.
 
 **Test**
 
@@ -147,7 +150,19 @@ Each value can also be passed inline as CDK context, e.g. `cdk deploy -c alarmEm
 npm test
 ```
 
-Runs the Jest suite in [`test/web-crawler.test.js`](test/web-crawler.test.js), which asserts on the synthesized CloudFormation template rather than mocking AWS.
+Runs the five infrastructure tests in [`test/web-crawler.test.js`](test/web-crawler.test.js) using `node --test`. They assert on the synthesized CloudFormation template rather than mocking AWS.
+
+**Dependency security**
+
+```bash
+npm run audit
+```
+
+GitHub Actions checks both lockfiles, runs the tests, and synthesizes both stacks on pull requests, pushes to `main`, and every week. CodeBuild checks both lockfiles before deployment. High and critical vulnerabilities fail these checks; lower severities remain visible in the audit output. Neither workflow creates commits or automatically deploys from GitHub Actions.
+
+As of 2026-11-03, CDK 2.275.0 bundles `brace-expansion` 5.0.12, which fixes alert #36 and the related brace-expansion advisories. Jest and its type package were removed because these tests only need Node's built-in runner.
+
+One upstream issue remains: CDK bundles `minimatch` 10.2.6, affected by [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249). `npm audit` reports two moderate entries for this single issue (`minimatch` and its parent `aws-cdk-lib`). The fix requires minimatch 11.0.1+, which the current CDK release does not bundle. npm overrides do not replace this bundled copy. Update CDK when AWS ships a release containing the fix. Security alerts remain enabled; future vulnerabilities still require dependency maintenance.
 
 **Deploy**
 
@@ -175,7 +190,7 @@ npx cdk destroy WebCrawlerStack
 - **Scaling alarms with the URL list, not against it.** Hardcoding one alarm pair per site would mean editing the stack every time a site is added or removed. Deriving `this.urlNames` from `urls.json` and looping alarm creation over it means the number of monitored sites is a data change, not a code change — the trade-off is that the stack's resource count (and CloudFormation deploy time) grows with the URL list, which is worth watching as it scales.
 - **Decoupling "what to monitor" from "how to monitor it."** Fetching `urls.json` from S3 as a pre-build step (wired into `buildspec.yml`) rather than committing target URLs directly keeps the deployable artifact reproducible from git while still letting the monitored set change independently — a common pattern for separating config from code, applied here to infrastructure rather than an application.
 - **Turning ephemeral alarms into queryable history.** CloudWatch alarms are transient by nature — they tell you the *current* state, not what happened last week. Subscribing a Lambda to the same SNS topic that emails a human, and having it write structured records to DynamoDB, turns every state change into a queryable audit trail without touching the alarm or canary definitions.
-- **Testing infrastructure definitions, not just application logic.** The Jest suite doesn't unit test business logic — the project barely has any — it asserts that `cdk synth` actually produces the resources the design calls for (correct bucket naming pattern, canary schedule and runtime, table keys, Lambda runtime, SNS topic). That test suite is wired into `buildspec.yml`'s `pre_build` phase, so a broken CDK construct fails the pipeline before a CloudFormation deploy is even attempted.
+- **Testing infrastructure definitions, not just application logic.** The Node.js test suite asserts that `cdk synth` produces the resources the design calls for (correct bucket naming pattern, canary schedule and runtime, table keys, Lambda runtime, SNS topic). That test suite is wired into `buildspec.yml`'s `pre_build` phase, so a broken CDK construct fails the pipeline before a CloudFormation deploy is even attempted.
 - **Separating "can run the pipeline" from "can deploy to production."** Rather than giving the CodePipeline's own role permission to update CloudFormation stacks directly, `web-crawler-pipeline-stack.js` creates a distinct `DeploymentRole` and wires an explicit `sts:AssumeRole` trust policy scoped to the pipeline role. It's more setup than a single admin role, but it keeps the blast radius of a compromised pipeline role limited to *triggering* a deploy, not *performing* one.
 - **No environment-specific values baked into source.** The alarm recipient, S3 bucket, and GitHub source are all read from environment variables or CDK context (documented in [`.env.example`](.env.example)), while account and region come from the deploying CDK environment rather than being hardcoded. This keeps the repository safe to open-source and lets the same code deploy into any account without edits — configuration is kept separate from code. IAM policies are scoped the same way: the canary gets only the specific S3 actions it needs (not `s3:*`), and resource ARNs resolve to the deploying account rather than a fixed account ID.
 
